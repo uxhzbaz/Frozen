@@ -13,7 +13,7 @@ jobs:
     env:
       NDK_VERSION: r25c
       TARGET: aarch64-linux-android31
-      PROJECT_DIR: Frozen-Main  # 添加项目目录变量
+      PROJECT_DIR: Frozen-Main
 
     steps:
     - name: Checkout code
@@ -26,11 +26,9 @@ jobs:
         echo "NDK_PATH=$PWD/android-ndk-${{ env.NDK_VERSION }}" >> $GITHUB_ENV
 
     - name: Setup PowerShell
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: |
-          7.0.x
-          6.0.x
+        dotnet-version: '7.0.x'
 
     - name: Build executable
       shell: pwsh
@@ -48,8 +46,8 @@ jobs:
 
         # 设置项目路径
         $projectDir = "$env:PROJECT_DIR"
-        $srcPath = "$projectDir/Frozen/src/main.cpp"  # 使用 Frozen/src/main.cpp
-        $altSrcPath = "$projectDir/main.cpp"          # 备用路径
+        $srcPath = "$projectDir/Frozen/src/main.cpp"
+        $altSrcPath = "$projectDir/main.cpp"
 
         # 检查源文件是否存在
         if (-not (Test-Path $srcPath)) {
@@ -91,7 +89,7 @@ jobs:
         log "文件大小: $((Get-Item ./build/Frozen).Length/1KB) KB"
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: android-binary
         path: ./build/Frozen
