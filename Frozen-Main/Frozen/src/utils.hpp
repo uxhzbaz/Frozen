@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils.hpp"
 #include <sstream>
 #include <fstream>
 #include <string>
@@ -52,6 +53,7 @@
 #include <sys/system_properties.h>
 #include <linux/netlink.h>
 #include <netinet/tcp.h>
+#include <sys/resource.h>
 
 using std::set;
 using std::unordered_set;
@@ -70,6 +72,18 @@ using std::mutex;
 using std::make_unique;
 using std::to_string;
 
+
+namespace Utils {
+
+    // ADD THESE TWO FUNCTIONS
+    void setThreadName(const char* name) {
+        prctl(PR_SET_NAME, name);
+    }
+
+    void setProcessPriority() {
+        setpriority(PRIO_PROCESS, 0, -20);
+    }
+}
 
 // 配置编译选项 *****************
 constexpr auto FORK_DOUBLE = 1;
