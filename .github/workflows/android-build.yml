@@ -1,0 +1,80 @@
+name: Android Cross-Compilation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: r25c
+      TARGET: aarch64-linux-android31
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up NDK
+      run: |
+        # 下载并解压 Android NDK
+        wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux.zip
+        unzip -q android-ndk-$NDK_VERSION-linux.zip
+        echo "NDK_PATH=$PWD/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
+
+    - name: Setup PowerShell
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: |
+          7.0.x
+          6.0.x
+
+    - name: Build executable
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+
+        function log {
+            [CmdletBinding()]
+            Param(
+                [Parameter(Mandatory = $true, Position = 0)]
+                [string]$LogMessage
+            )
+            Write-Output ("[{0}] {1}" -f (Get-Date), $LogMessage)
+        }
+
+        # 设置 NDK 路径
+        $ndkPath = $env:NDK_PATH
+        $clang = Join-Path $ndkPath "toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+        
+        # 验证编译器是否存在
+        if (-not (Test-Path $clang)) {
+            throw "Clang++ not found at $clang"
+        }
+
+        $sysroot = "--sysroot=$(Join-Path $ndkPath 'toolchains/llvm/prebuilt/linux-x86_64/sysroot')"
+        $cppFlags = "--target=$env:TARGET -std=c++20 -static -s -Ofast -flto -funroll-loops -finline-functions -fomit-frame-pointer -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
+        
+        log "正在创建临时文件夹"
+        Remove-Item -Recurse -Force ./build -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path ./build | Out-Null
+        
+        log "构建中..."
+        & $clang $sysroot $cppFlags.Split(' ') -I. ./src/main.cpp -o build/Frozen
+
+        if (-not $?) {
+            log "构建失败"
+            exit 1
+        }
+
+        log "Frozen编译成功"
+        Get-ChildItem ./build/Frozen
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: android-binary
+        path: ./build/Frozen
