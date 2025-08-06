@@ -459,8 +459,9 @@ public:
             snprintf(path, sizeof(path), "/proc/%d/reclaim", pid);
             Utils::FileWrite(path, "file");
             freezeit.logFmt("内存回收: %s PID:%d", appInfo.label.c_str(), pid);
-        }
+        }if (settings.enableDebug)  
     }
+
 
     // 重新压制第三方。 白名单, 前台, 待冻结列队 都跳过
     void checkReFreezeBackup() {
