@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     Utils::Init();
 
     // 使用两个参数的构造函数
-    Freezeit freezeit(argc, std::move(fullPath));
+    Freezeit freezeit(argc);
     Settings settings(freezeit);
     ManagedApp managedApp(freezeit, settings);
     SystemTools systemTools(freezeit, settings);
