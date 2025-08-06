@@ -12,10 +12,9 @@ env:
   PROJECT_DIR: Frozen-Main
 
 jobs:
-  build-multi-arch:
+  # JOB 1: Build all architectures in parallel
+  build:
     runs-on: ubuntu-latest
-
-    # Define a matrix to build for multiple architectures in parallel
     strategy:
       matrix:
         include:
@@ -57,68 +56,62 @@ jobs:
 
     - name: Build for ${{ matrix.arch }}
       shell: pwsh
-      # Pass matrix variables to the script via environment variables
       env:
         TARGET: ${{ matrix.target }}
         OUTPUT_NAME: ${{ matrix.output_name }}
       run: |
         $ErrorActionPreference = 'Stop'
+        function log { Write-Output ("[{0}] {1}" -f (Get-Date), $args[0]) }
 
-        function log {
-            [CmdletBinding()]
-            Param(
-                [Parameter(Mandatory = $true, Position = 0)]
-                [string]$LogMessage
-            )
-            Write-Output ("[{0}] {1}" -f (Get-Date), $LogMessage)
-        }
-
-        # Set paths from environment variables
         $projectDir = "$env:PROJECT_DIR"
         $srcPath = "$projectDir/Frozen/src/main.cpp"
-        $altSrcPath = "$projectDir/main.cpp"
-        $ndkPath = $env:NDK_PATH
         $outputFile = "build/$env:OUTPUT_NAME"
 
-        # Check for source file
-        if (-not (Test-Path $srcPath)) {
-            log "Primary source file not found at $srcPath, trying alternate."
-            $srcPath = $altSrcPath
-        }
-        if (-not (Test-Path $srcPath)) {
-            throw "Source file not found at either path."
-        }
+        if (-not (Test-Path $srcPath)) { $srcPath = "$projectDir/main.cpp" }
+        if (-not (Test-Path $srcPath)) { throw "Source file not found." }
         log "Using source file: $srcPath"
         
-        # Set up compiler and flags
+        $ndkPath = $env:NDK_PATH
         $clang = Join-Path $ndkPath "toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
-        if (-not (Test-Path $clang)) {
-            throw "Clang++ not found at $clang"
-        }
+        if (-not (Test-Path $clang)) { throw "Clang++ not found at $clang" }
 
         $sysroot = "--sysroot=$(Join-Path $ndkPath 'toolchains/llvm/prebuilt/linux-x86_64/sysroot')"
-        # Use the TARGET environment variable set from the matrix
         $cppFlags = "--target=$env:TARGET -std=c++20 -static -s -Ofast -flto -funroll-loops -finline-functions -fomit-frame-pointer -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
         
-        log "Creating build directory..."
         New-Item -ItemType Directory -Path ./build -Force | Out-Null
         
         log "Compiling for $env:TARGET..."
         & $clang $sysroot $cppFlags.Split(' ') -I"$projectDir" -I"$projectDir/Frozen/src" $srcPath -o $outputFile
 
-        if (-not $?) {
-            throw "Build failed for $env:TARGET"
-        }
+        if (-not $?) { throw "Build failed for $env:TARGET" }
+        log "$env:OUTPUT_NAME compiled successfully! Size: $((Get-Item $outputFile).Length/1KB) KB"
 
-        log "$env:OUTPUT_NAME compiled successfully!"
-        Get-ChildItem $outputFile
-        log "File size: $((Get-Item $outputFile).Length/1KB) KB"
+    # Each parallel job uploads its own, uniquely named artifact
+    - name: Upload ${{ matrix.output_name }} artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.output_name }}
+        path: ./build/${{ matrix.output_name }}
 
-    # This step runs after all matrix jobs are complete
-    - name: Upload all binaries as a single artifact
-      # Use an 'if: always()' condition to ensure artifacts are uploaded even if one of the matrix jobs fails
-      if: always()
+  # JOB 2: Package all binaries into a single artifact
+  package:
+    runs-on: ubuntu-latest
+    # This 'needs' directive ensures this job only runs after all matrix jobs in 'build' are successful
+    needs: build
+    
+    steps:
+    - name: Create download directory
+      run: mkdir ./binaries
+
+    # Download all artifacts from this workflow run into the 'binaries' directory
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./binaries
+
+    # Upload the entire 'binaries' directory, which now contains all executables, as a single artifact
+    - name: Upload combined artifact
       uses: actions/upload-artifact@v4
       with:
         name: android-binaries
-        path: ./build/
+        path: ./binaries/
