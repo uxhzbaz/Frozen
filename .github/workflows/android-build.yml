@@ -13,6 +13,7 @@ jobs:
     env:
       NDK_VERSION: r25c
       TARGET: aarch64-linux-android31
+      PROJECT_DIR: Frozen-Main  # 添加项目目录变量
 
     steps:
     - name: Checkout code
@@ -20,10 +21,9 @@ jobs:
 
     - name: Set up NDK
       run: |
-        # 下载并解压 Android NDK
-        wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux.zip
-        unzip -q android-ndk-$NDK_VERSION-linux.zip
-        echo "NDK_PATH=$PWD/android-ndk-$NDK_VERSION" >> $GITHUB_ENV
+        wget -q https://dl.google.com/android/repository/android-ndk-${{ env.NDK_VERSION }}-linux.zip
+        unzip -q android-ndk-${{ env.NDK_VERSION }}-linux.zip
+        echo "NDK_PATH=$PWD/android-ndk-${{ env.NDK_VERSION }}" >> $GITHUB_ENV
 
     - name: Setup PowerShell
       uses: actions/setup-dotnet@v3
@@ -46,7 +46,24 @@ jobs:
             Write-Output ("[{0}] {1}" -f (Get-Date), $LogMessage)
         }
 
-        # 设置 NDK 路径
+        # 设置项目路径
+        $projectDir = "$env:PROJECT_DIR"
+        $srcPath = "$projectDir/Frozen/src/main.cpp"  # 使用 Frozen/src/main.cpp
+        $altSrcPath = "$projectDir/main.cpp"          # 备用路径
+
+        # 检查源文件是否存在
+        if (-not (Test-Path $srcPath)) {
+            log "主源文件 $srcPath 不存在，尝试备用路径"
+            $srcPath = $altSrcPath
+        }
+        
+        if (-not (Test-Path $srcPath)) {
+            throw "未找到源文件: $srcPath"
+        }
+
+        log "使用源文件: $srcPath"
+        
+        # 设置编译器路径
         $ndkPath = $env:NDK_PATH
         $clang = Join-Path $ndkPath "toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
         
@@ -58,12 +75,11 @@ jobs:
         $sysroot = "--sysroot=$(Join-Path $ndkPath 'toolchains/llvm/prebuilt/linux-x86_64/sysroot')"
         $cppFlags = "--target=$env:TARGET -std=c++20 -static -s -Ofast -flto -funroll-loops -finline-functions -fomit-frame-pointer -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
         
-        log "正在创建临时文件夹"
-        Remove-Item -Recurse -Force ./build -ErrorAction SilentlyContinue
-        New-Item -ItemType Directory -Path ./build | Out-Null
+        log "正在创建构建目录"
+        New-Item -ItemType Directory -Path ./build -Force | Out-Null
         
         log "构建中..."
-        & $clang $sysroot $cppFlags.Split(' ') -I. ./src/main.cpp -o build/Frozen
+        & $clang $sysroot $cppFlags.Split(' ') -I"$projectDir" -I"$projectDir/Frozen/src" $srcPath -o build/Frozen
 
         if (-not $?) {
             log "构建失败"
@@ -72,6 +88,7 @@ jobs:
 
         log "Frozen编译成功"
         Get-ChildItem ./build/Frozen
+        log "文件大小: $((Get-Item ./build/Frozen).Length/1KB) KB"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
