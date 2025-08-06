@@ -3,7 +3,7 @@
 
 该改版希望在原版的基础上修改一个"性能" "稳定" "更多自定义功能" "流畅"的墓碑
 
-使用GitHub Actions编译(不知道怎么样🤤🤤🤤)
+使用GitHub Actions编译(不知道怎么样🤤🤤🤤)#https://github.com/uxhzbaz/Frozen/actions
 | 架构      | 编译目标                      | 最低 Android 版本 | 兼容范围           |
 |-----------|-------------------------------|-------------------|--------------------|
 | ARM64     | aarch64-linux-android31   | Android 12 (API 31) | Android 12+    |
