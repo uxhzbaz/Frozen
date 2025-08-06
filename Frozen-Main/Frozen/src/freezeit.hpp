@@ -2,6 +2,7 @@
 
 #include "utils.hpp"
 #include "vpopen.hpp"
+#include <string> // 添加 string 头文件
 
 class Freezeit {
 private:
@@ -18,6 +19,7 @@ private:
 
 
     uint8_t* deBugFlagPtr = nullptr;
+    std::string fullPath; // 添加存储完整路径的成员变量
 
     // "Jul 28 2022" --> "2022-07-28"
     const char compilerDate[12] = {
@@ -98,9 +100,18 @@ public:
 
     Freezeit& operator=(Freezeit&&) = delete;
 
+    // 添加双参数构造函数
+    Freezeit(int argc, std::string path) : fullPath(std::move(path)) {
+        init(argc);
+    }
+
+    // 保留单参数构造函数
     Freezeit(int argc) {
-
-
+        init(argc);
+    }
+    
+    // 初始化函数（共享的初始化逻辑）
+    void init(int argc) {
         int versionCode = -1;
         if (!access("/system/bin/magisk", F_OK)) {
             moduleEnv = "Magisk";
@@ -119,13 +130,13 @@ public:
             }
         }
         else if (!access("/data/adb/ap/bin/apd", F_OK)) {
-			moduleEnv = "APatch";
-			versionCode = APatch::get_version_code();
-			if (versionCode <= 0) {
-				sleep(2);
-				versionCode = APatch::get_version_code();
-			}
-		}
+            moduleEnv = "APatch";
+            versionCode = APatch::get_version_code();
+            if (versionCode <= 0) {
+                sleep(2);
+                versionCode = APatch::get_version_code();
+            }
+        }
         if (versionCode > 0)
             moduleEnv += " (" + to_string(versionCode) + ")";
 
@@ -160,8 +171,6 @@ public:
             prop[string(tmp)] = string(ptr + 1);
         }
         fclose(fp);
-
-
 
         logFmt("模块版本 %s(%s)", prop["version"].c_str(), prop["versionCode"].c_str());
         logFmt("编译时间 %s %s UTC+8", compilerDate, __TIME__);
