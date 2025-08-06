@@ -1,0 +1,124 @@
+name: Android Cross-Compilation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: r25c
+  PROJECT_DIR: Frozen-Main
+
+jobs:
+  build-multi-arch:
+    runs-on: ubuntu-latest
+
+    # Define a matrix to build for multiple architectures in parallel
+    strategy:
+      matrix:
+        include:
+          - arch: ARM64
+            target: aarch64-linux-android31
+            output_name: FrozenARM64
+          - arch: ARM32
+            target: armv7a-linux-android31
+            output_name: FrozenARM32
+          - arch: x86_64
+            target: x86_64-linux-android31
+            output_name: FrozenX86_64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Cache NDK
+      id: cache-ndk
+      uses: actions/cache@v4
+      with:
+        path: android-ndk-${{ env.NDK_VERSION }}
+        key: ${{ runner.os }}-ndk-${{ env.NDK_VERSION }}
+
+    - name: Set up NDK (if cache miss)
+      if: steps.cache-ndk.outputs.cache-hit != 'true'
+      run: |
+        echo "Cache not found, downloading NDK..."
+        wget -q https://dl.google.com/android/repository/android-ndk-${{ env.NDK_VERSION }}-linux.zip
+        unzip -q android-ndk-${{ env.NDK_VERSION }}-linux.zip
+        
+    - name: Set NDK Path Environment Variable
+      run: echo "NDK_PATH=$PWD/android-ndk-${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+
+    - name: Setup PowerShell
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.0.x'
+
+    - name: Build for ${{ matrix.arch }}
+      shell: pwsh
+      # Pass matrix variables to the script via environment variables
+      env:
+        TARGET: ${{ matrix.target }}
+        OUTPUT_NAME: ${{ matrix.output_name }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+
+        function log {
+            [CmdletBinding()]
+            Param(
+                [Parameter(Mandatory = $true, Position = 0)]
+                [string]$LogMessage
+            )
+            Write-Output ("[{0}] {1}" -f (Get-Date), $LogMessage)
+        }
+
+        # Set paths from environment variables
+        $projectDir = "$env:PROJECT_DIR"
+        $srcPath = "$projectDir/Frozen/src/main.cpp"
+        $altSrcPath = "$projectDir/main.cpp"
+        $ndkPath = $env:NDK_PATH
+        $outputFile = "build/$env:OUTPUT_NAME"
+
+        # Check for source file
+        if (-not (Test-Path $srcPath)) {
+            log "Primary source file not found at $srcPath, trying alternate."
+            $srcPath = $altSrcPath
+        }
+        if (-not (Test-Path $srcPath)) {
+            throw "Source file not found at either path."
+        }
+        log "Using source file: $srcPath"
+        
+        # Set up compiler and flags
+        $clang = Join-Path $ndkPath "toolchains/llvm/prebuilt/linux-x86_64/bin/clang++"
+        if (-not (Test-Path $clang)) {
+            throw "Clang++ not found at $clang"
+        }
+
+        $sysroot = "--sysroot=$(Join-Path $ndkPath 'toolchains/llvm/prebuilt/linux-x86_64/sysroot')"
+        # Use the TARGET environment variable set from the matrix
+        $cppFlags = "--target=$env:TARGET -std=c++20 -static -s -Ofast -flto -funroll-loops -finline-functions -fomit-frame-pointer -Wall -Wextra -Wshadow -fno-exceptions -fno-rtti -DNDEBUG -fPIE"
+        
+        log "Creating build directory..."
+        New-Item -ItemType Directory -Path ./build -Force | Out-Null
+        
+        log "Compiling for $env:TARGET..."
+        & $clang $sysroot $cppFlags.Split(' ') -I"$projectDir" -I"$projectDir/Frozen/src" $srcPath -o $outputFile
+
+        if (-not $?) {
+            throw "Build failed for $env:TARGET"
+        }
+
+        log "$env:OUTPUT_NAME compiled successfully!"
+        Get-ChildItem $outputFile
+        log "File size: $((Get-Item $outputFile).Length/1KB) KB"
+
+    # This step runs after all matrix jobs are complete
+    - name: Upload all binaries as a single artifact
+      # Use an 'if: always()' condition to ensure artifacts are uploaded even if one of the matrix jobs fails
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-binaries
+        path: ./build/
