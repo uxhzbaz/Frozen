@@ -459,8 +459,7 @@ void handleNetworkBreak(appInfoStruct& appInfo) {
             break;
     }
 }
-
-    // 重新压制第三方。 白名单, 前台, 待冻结列队 都跳过
+// 重新压制第三方。 白名单, 前台, 待冻结列队 都跳过
     void checkReFreezeBackup() {
         START_TIME_COUNT;
 
