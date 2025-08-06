@@ -98,7 +98,7 @@ public:
 
     Freezeit& operator=(Freezeit&&) = delete;
 
-    Freezeit(int argc) {
+    Freezeit(int argc, const string& fullPath) {
 
 
         int versionCode = -1;
