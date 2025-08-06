@@ -20,14 +20,19 @@
 #include "freezer.hpp"
 #include "server.hpp"
 
-int main(int argc, char **argv) {
+#include "freezeit.hpp"
+#include "systemTools.hpp"
+// ... [其他包含文件] ...
 
-    char tmp[1024];
-    string fullPath(realpath(argv[0], tmp));
+int main(int argc, char* argv[]) {
+    string fullPath(argv[0]);
+    
+    Utils::setThreadName("FreezeitMain");
+    Utils::setProcessPriority();
 
     Utils::Init();
 
-    Freezeit freezeit(argc,  std::move(fullPath));
+    Freezeit freezeit(argc, fullPath);
     Settings settings(freezeit);
     ManagedApp managedApp(freezeit, settings);
     SystemTools systemTools(freezeit, settings);
