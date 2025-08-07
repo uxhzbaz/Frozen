@@ -12,6 +12,7 @@ env:
   PROJECT_DIR: Frozen-Main
 
 jobs:
+
   # JOB 1: Build all architectures in parallel
   build:
     runs-on: ubuntu-latest
@@ -24,9 +25,6 @@ jobs:
           - arch: ARM32
             target: armv7a-linux-android31
             output_name: FrozenARM32
-          - arch: x86_64
-            target: x86_64-linux-android31
-            output_name: FrozenX86_64
 
     steps:
     - name: Checkout code
@@ -98,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     # This 'needs' directive ensures this job only runs after all matrix jobs in 'build' are successful
     needs: build
-    
+
     steps:
     - name: Create download directory
       run: mkdir ./binaries
