@@ -98,7 +98,10 @@ public:
 
     Freezeit& operator=(Freezeit&&) = delete;
 
-    Freezeit(int argc, const string& fullPath) {
+    Freezeit(int argc, std::string fullPath) : fullPath(std::move(fullPath)) {
+        // 保存完整路径
+        this->fullPath = fullPath;
+    }
 
 
         int versionCode = -1;
