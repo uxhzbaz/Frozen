@@ -459,7 +459,7 @@ public:
             snprintf(path, sizeof(path), "/proc/%d/reclaim", pid);
             Utils::FileWrite(path, "file");
             freezeit.logFmt("内存回收: %s PID:%d", appInfo.label.c_str(), pid);
-        }if (settings.enableDebug)  
+        }if (settings.enableDebug) {  
     };
 
 
