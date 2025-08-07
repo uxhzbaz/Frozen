@@ -25,6 +25,12 @@ jobs:
           - arch: ARM32
             target: armv7a-linux-android31
             output_name: FrozenARM32
+          - arch: X86
+            target: i686-linux-android31
+            output_name: FrozenX86
+          - arch: X86_64
+            target: x86_64-linux-android31
+            output_name: FrozenX86_64
 
     steps:
     - name: Checkout code
